@@ -1,38 +1,13 @@
 import asyncio
 import logging
 import re
-from msldap.commons.url import MSLDAPURLDecoder
-from msldap.ldap_objects import MSADGPO
 from pygpoabuse.scheduledtask import ScheduledTask
+from pygpoabuse.ldap import Ldap
 
 
 class GPO:
     def __init__(self, smb_session):
         self._smb_session = smb_session
-
-    async def client(self, url, gpo_id):
-        dn = 'CN={' + gpo_id + '},CN=Policies,CN=System,DC=hackn,DC=lab'
-        conn_url = MSLDAPURLDecoder(url)
-        ldap_client = conn_url.get_client()
-        _, err = await ldap_client.connect()
-        if err is not None:
-            raise err
-
-        async for gpo in ldap_client.get_object_by_dn(dn, expected_class=MSADGPO):
-            gPCMachineExtensionNames = gpo.gPCMachineExtensionNames
-            versionNumber = gpo.versionNumber
-
-            updated_gPCMachineExtensionNames = self.update_gPCMachineExtensionNames(gPCMachineExtensionNames)
-            updated_versionNumber = versionNumber + 1
-
-            _, err = await ldap_client.modify_object_by_dn(dn, {
-                'gPCMachineExtensionNames': [('replace', [updated_gPCMachineExtensionNames])],
-                'versionNumber': [('replace', [updated_versionNumber])],
-            })
-            if err is not None:
-                raise err
-
-            return updated_versionNumber
 
     def update_gPCMachineExtensionNames(self, gPCMachineExtensionNames):
         val1 = "00000000-0000-0000-0000-000000000000"
@@ -98,26 +73,48 @@ class GPO:
         except:
             return "[{" + val1 + "}{" + val2 + "}]" + "[{" + val3 + "}{" + val2 + "}]"
 
-    def update_versions(self, url, domain, gpo_id):
-        versionNumber = asyncio.run(self.client(url, gpo_id))
-
-        if not versionNumber:
-            logging.error("Unable to update LDAP object")
+    async def update_ldap(self, url, domain, gpo_id):
+        ldap = Ldap(url, gpo_id, domain)
+        r = await ldap.connect()
+        if not r:
             return False
 
-        logging.debug("Updated version number : {}".format(versionNumber))
+        version = await ldap.get_attribute("versionNumber")
+        if not version:
+            return False
+
+        gPCMachineExtensionNames = await ldap.get_attribute("gPCMachineExtensionNames")
+        if not gPCMachineExtensionNames:
+            return False
+
+        updated_version = version + 1
+        updated_gPCMachineExtensionNames = self.update_gPCMachineExtensionNames(gPCMachineExtensionNames)
+
+        await ldap.update_attribute("versionNumber", updated_version)
+        await ldap.update_attribute("gPCMachineExtensionNames", updated_gPCMachineExtensionNames)
+
+        return updated_version
+
+    def update_versions(self, url, domain, gpo_id):
+        updated_version = asyncio.run(self.update_ldap(url, domain, gpo_id))
+
+        if not updated_version:
+            return False
+
+        logging.debug("Updated version number : {}".format(updated_version))
 
         try:
             tid = self._smb_session.connectTree("SYSVOL")
             fid = self._smb_session.openFile(tid, domain + "/Policies/{" + gpo_id + "}/gpt.ini")
             content = self._smb_session.readFile(tid, fid)
 
-            new_content = re.sub('=[0-9]+', '={}'.format(versionNumber), content.decode("utf-8"))
+            new_content = re.sub('=[0-9]+', '={}'.format(updated_version), content.decode("utf-8"))
             self._smb_session.writeFile(tid, fid, new_content)
             self._smb_session.closeFile(tid, fid)
         except:
             logging.error("Unable to update gpt.ini file", exc_info=True)
             return False
+
         logging.debug("gpt.ini file successfully updated")
         return True
 
