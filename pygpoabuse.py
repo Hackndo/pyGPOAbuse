@@ -115,6 +115,6 @@ try:
         else:
             logging.error("Error while updating versions")
             sys.exit(1)
-        logging.success("ScheduledTask {} created! ({})".format(task_name, ))
+        logging.success("ScheduledTask {} created!".format(task_name))
 except Exception as e:
     logging.error("An error occurred. Use -vv for more details", exc_info=True)
