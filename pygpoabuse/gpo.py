@@ -183,7 +183,7 @@ class GPO:
                     "The GPO already includes a ScheduledTasks.xml. Use -f to append to ScheduledTasks.xml or choose another GPO")
                 return False
             st_content = self._smb_session.readFile(tid, fid, singleCall=False).decode("utf-8")
-            st = ScheduledTask(name=name, mod_date=mod_date, description=description, powershell=powershell, command=command, old_value=st_content)
+            st = ScheduledTask(gpo_type=gpo_type, name=name, mod_date=mod_date, description=description, powershell=powershell, command=command, old_value=st_content)
             new_content = st.generate_scheduled_task_xml()
         except Exception as e:
             # File does not exist

