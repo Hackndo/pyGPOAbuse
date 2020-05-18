@@ -20,13 +20,20 @@ class Ldap:
         return True
 
     async def get_attribute(self, attribute):
-        async for gpo in self.ldap_client.get_object_by_dn(self.dn, expected_class=MSADGPO):
+        async for gpo, err in self.ldap_client.get_object_by_dn(self.dn, expected_class=MSADGPO):
             try:
                 return getattr(gpo, attribute)
             except Exception as e:
-                return False
+                return "An error occurred", str(e)
 
-    async def update_attribute(self, attribute, value):
-        _, err = await self.ldap_client.modify_object_by_dn(self.dn, {
-            attribute: [('replace', [value])]
+    async def update_attribute(self, attribute, value, old_value=None):
+        if old_value is None:
+            action = 'add'
+        else:
+            action = 'replace'
+        _, err = await self.ldap_client.modify(self.dn, {
+            attribute: [(action, [value])]
         })
+        if err is not None:
+            logging.debug("Error while updating {}".format(attribute))
+            logging.debug(err)

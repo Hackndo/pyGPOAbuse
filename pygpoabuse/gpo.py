@@ -9,15 +9,18 @@ class GPO:
     def __init__(self, smb_session):
         self._smb_session = smb_session
 
-    def update_gPCMachineExtensionNames(self, gPCMachineExtensionNames):
+    def update_extensionNames(self, extensionName):
         val1 = "00000000-0000-0000-0000-000000000000"
         val2 = "CAB54552-DEEA-4691-817E-ED4A4D1AFC72"
         val3 = "AADCED64-746C-4633-A97C-D61349046527"
 
+        if extensionName is None:
+            extensionName = ""
+
         try:
-            if not val2 in gPCMachineExtensionNames:
+            if not val2 in extensionName:
                 new_values = []
-                toUpdate = gPCMachineExtensionNames
+                toUpdate = extensionName
                 test = toUpdate.split("[")
                 for i in test:
                     new_values.append(i.replace("{", "").replace("}", " ").replace("]", ""))
@@ -73,30 +76,42 @@ class GPO:
         except:
             return "[{" + val1 + "}{" + val2 + "}]" + "[{" + val3 + "}{" + val2 + "}]"
 
-    async def update_ldap(self, url, domain, gpo_id):
+    async def update_ldap(self, url, domain, gpo_id, gpo_type="computer"):
         ldap = Ldap(url, gpo_id, domain)
         r = await ldap.connect()
         if not r:
+            logging.debug("Could not connect to LDAP")
             return False
 
         version = await ldap.get_attribute("versionNumber")
         if not version:
+            logging.debug("Could not get versionNumber attribute")
             return False
 
-        gPCMachineExtensionNames = await ldap.get_attribute("gPCMachineExtensionNames")
-        if not gPCMachineExtensionNames:
+        if gpo_type == "computer":
+            attribute_name = "gPCMachineExtensionNames"
+            updated_version = version + 1
+        else:
+            attribute_name = "gPCUserExtensionNames"
+            updated_version = version + 65536
+
+        extensionName = await ldap.get_attribute(attribute_name)
+
+        if extensionName == False:
+            logging.debug("Could not get {} attribute".format(attribute_name))
             return False
 
-        updated_version = version + 1
-        updated_gPCMachineExtensionNames = self.update_gPCMachineExtensionNames(gPCMachineExtensionNames)
+        updated_extensionName = self.update_extensionNames(extensionName)
 
-        await ldap.update_attribute("versionNumber", updated_version)
-        await ldap.update_attribute("gPCMachineExtensionNames", updated_gPCMachineExtensionNames)
+        logging.debug("New extensionName: {}".format(updated_extensionName))
+
+        await ldap.update_attribute(attribute_name, updated_extensionName, extensionName)
+        await ldap.update_attribute("versionNumber", updated_version, version)
 
         return updated_version
 
-    def update_versions(self, url, domain, gpo_id):
-        updated_version = asyncio.run(self.update_ldap(url, domain, gpo_id))
+    def update_versions(self, url, domain, gpo_id, gpo_type):
+        updated_version = asyncio.run(self.update_ldap(url, domain, gpo_id, gpo_type))
 
         if not updated_version:
             return False
@@ -133,7 +148,7 @@ class GPO:
                     return False
         return True
 
-    def update_scheduled_task(self, domain, gpo_id, name="", mod_date="", description="", powershell=False, command="", force=False):
+    def update_scheduled_task(self, domain, gpo_id, name="", mod_date="", description="", powershell=False, command="", gpo_type="computer", force=False):
 
         try:
             tid = self._smb_session.connectTree("SYSVOL")
@@ -151,10 +166,15 @@ class GPO:
             logging.error("GPO id {} does not exist".format(gpo_id), exc_info=True)
             return False
 
-        if not self._check_or_create(path, "Machine/Preferences/ScheduledTasks"):
+        if gpo_type == "computer":
+            root_path = "Machine"
+        else:
+            root_path = "User"
+
+        if not self._check_or_create(path, "{}/Preferences/ScheduledTasks".format(root_path)):
             return False
 
-        path += "Machine/Preferences/ScheduledTasks/ScheduledTasks.xml"
+        path += "{}/Preferences/ScheduledTasks/ScheduledTasks.xml".format(root_path)
 
         try:
             fid = self._smb_session.openFile(tid, path)
