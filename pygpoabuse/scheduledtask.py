@@ -6,6 +6,8 @@ import uuid
 from base64 import b64encode
 from datetime import datetime, timedelta
 from xml.sax.saxutils import escape
+import xml.etree.ElementTree as ET
+
 
 
 class ScheduledTask:
@@ -61,3 +63,18 @@ class ScheduledTask:
 
     def get_name(self):
         return self._name
+
+    def parse_tasks(self, xml_tasks):
+        elem = ET.fromstring(xml_tasks)
+        tasks = []
+        for child in elem.findall("*"):
+            task_type = child.tag
+            task_properties = child.find("Properties")
+            action = task_properties.get('action')
+            name = task_properties.get('name')
+            tasks.append([
+                action if action is not None else "?",
+                name if name is not None else "<unknown>",
+                task_type if task_type is not None else "<unknown>"
+            ])
+        return tasks
