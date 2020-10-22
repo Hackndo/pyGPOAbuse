@@ -52,7 +52,7 @@ elif options.v >= 2:
 else:
     logging.getLogger().setLevel(logging.ERROR)
 
-targetParam = options.target + '@'
+targetParam = options.target 
 domain, username, password, address = re.compile('(?:(?:([^/@:]*)/)?([^@:]*)(?::([^@]*))?@)?(.*)').match(
     targetParam).groups('')
 
@@ -75,10 +75,10 @@ elif options.hashes is not None:
 
 dc_ip = domain
 if password != '':
-    url = 'ldap+ntlm-password://hackn.lab\\{}:{}@10.10.10.1'.format(username, password)
+    url = 'ldap+ntlm-password://{}\\{}:{}@{}'.format(domain, username, password, address)
     lmhash, nthash = "",""
 else:
-    url = 'ldap+ntlm-nt://hackn.lab\\{}:{}@10.10.10.1'.format(username, options.hashes.split(":")[1])
+    url = 'ldap+ntlm-nt://{}\\{}:{}@{}'.format(domain, username, options.hashes.split(":")[1], address)
     lmhash, nthash = options.hashes.split(":")
 
 
