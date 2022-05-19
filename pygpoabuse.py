@@ -34,9 +34,8 @@ parser.add_argument('-k', action='store_true', help='Use Kerberos authentication
                                         '(KRB5CCNAME) based on target parameters. If valid credentials '
                                         'cannot be found, it will use the ones specified in the command '
                                         'line')
-parser.add_argument('-no-pass', action='store_true', help='Don\'t ask for password (useful for -k)'),
-parser.add_argument('-dc-ip', action='store', help='Domain controller IP or hostname to query')
-parser.add_argument('-ldaps', action='store_true', help='Use LDAPS for authentication')
+parser.add_argument('-dc-ip', action='store', help='Domain controller IP or hostname')
+parser.add_argument('-ldaps', action='store_true', help='Use LDAPS instead of LDAP')
 parser.add_argument('-ccache', action='store', help='ccache file name (must be in local directory)')
 parser.add_argument('-f', action='store_true', help='Force add ScheduleTask')
 parser.add_argument('-v', action='count', default=0, help='Verbosity level (-v or -vv)')
@@ -64,23 +63,21 @@ else:
 domain, username, password = parse_credentials(options.target)
 
 if options.dc_ip:
-    address = options.dc_ip
+    dc_ip = options.dc_ip
 else:
-    address = domain
+    dc_ip = domain
 
 if domain == '':
     logging.critical('Domain should be specified!')
     sys.exit(1)
 
-if password == '' and username != '' and options.hashes is None and options.no_pass is False:
+if password == '' and username != '' and options.hashes is None and options.k is False:
     from getpass import getpass
     password = getpass("Password:")
 elif options.hashes is not None:
     if ":" not in options.hashes:
         logging.error("Wrong hash format. Expecting lm:nt")
         sys.exit(1)
-
-dc_ip = address
 
 if options.ldaps:
     protocol = 'ldaps'
@@ -89,14 +86,14 @@ else:
 
 if options.k:
     if not options.ccache:
-        logging.error('Name of ccache file in local directory required')
+        logging.error('-ccache required (path of ccache file, must be in local directory)')
         sys.exit(1)
-    url = '{}+kerberos-ccache://{}\\{}:{}@{}/?dc={}'.format(protocol, domain, username, options.ccache, address, address)
+    url = '{}+kerberos-ccache://{}\\{}:{}@{}/?dc={}'.format(protocol, domain, username, options.ccache, dc_ip, dc_ip)
 elif password != '':
-    url = '{}+ntlm-password://{}\\{}:{}@{}'.format(protocol, domain, username, password, address)
+    url = '{}+ntlm-password://{}\\{}:{}@{}'.format(protocol, domain, username, password, dc_ip)
     lmhash, nthash = "",""
 else:
-    url = '{}+ntlm-nt://{}\\{}:{}@{}'.format(protocol, domain, username, options.hashes.split(":")[1], address)
+    url = '{}+ntlm-nt://{}\\{}:{}@{}'.format(protocol, domain, username, options.hashes.split(":")[1], dc_ip)
     lmhash, nthash = options.hashes.split(":")
 
 
