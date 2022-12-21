@@ -20,7 +20,7 @@ class GPO:
         try:
             if not val2 in extensionName:
                 new_values = []
-                toUpdate = extensionName
+                toUpdate = ''.join(extensionName)
                 test = toUpdate.split("[")
                 for i in test:
                     new_values.append(i.replace("{", "").replace("}", " ").replace("]", ""))
