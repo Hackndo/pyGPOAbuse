@@ -119,8 +119,11 @@ class GPO:
             tid = self._smb_session.connectTree("SYSVOL")
             fid = self._smb_session.openFile(tid, domain + "/Policies/{" + gpo_id + "}/gpt.ini")
             content = self._smb_session.readFile(tid, fid)
-
-            new_content = re.sub('=[0-9]+', '={}'.format(updated_version), content.decode("utf-8"))
+             # Added by @Deft_ to comply with french active directories (mostly accents)
+            try:
+                new_content = re.sub('=[0-9]+', '={}'.format(updated_version), content.decode("utf-8"))
+            except UnicodeDecodeError:
+                new_content = re.sub('=[0-9]+', '={}'.format(updated_version), content.decode("latin-1"))
             self._smb_session.writeFile(tid, fid, new_content)
             self._smb_session.closeFile(tid, fid)
         except:
