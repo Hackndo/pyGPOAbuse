@@ -202,7 +202,7 @@ class GPO:
             except:
                 logging.error("This user doesn't seem to have the necessary rights", exc_info=True)
                 return False
-            st = ScheduledTask(name=name, mod_date=mod_date, description=description, powershell=powershell, command=command)
+            st = ScheduledTask(gpo_type=gpo_type, name=name, mod_date=mod_date, description=description, powershell=powershell, command=command)
             new_content = st.generate_scheduled_task_xml()
 
         try:
