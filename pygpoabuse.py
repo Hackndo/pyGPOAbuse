@@ -79,6 +79,9 @@ elif options.FilterUser:
         print("You need add the user's SID and samaccount who is going to apply filters or a file with samaccount:SID")
         exit()
 else:
+    if getattr(options, 'Samaccount', None) and getattr(options, 'SID', None):
+        print("You need the flag -FilterUser or -FilterComputer if you want user -Samaccount and -SID for a filter")
+        exit()
     user_sid="None"
     samaccount="None"
 
