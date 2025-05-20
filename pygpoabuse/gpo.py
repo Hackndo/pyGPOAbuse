@@ -3,6 +3,7 @@ import logging
 import re
 from pygpoabuse.scheduledtask import ScheduledTask
 from pygpoabuse.ldap import Ldap
+from impacket.smbconnection import SessionError
 
 
 class GPO:
@@ -214,3 +215,23 @@ class GPO:
             return False
         self._smb_session.closeFile(tid, fid)
         return st.get_name()
+
+    def rollback_scheduled_task(self, domain, gpo_id, gpo_type="computer"):
+        """
+        Delete ScheduledTasks.xml.
+        """
+
+        share = "SYSVOL"
+        root = "Machine" if gpo_type == "computer" else "User"
+        base = f"{domain}/Policies/{{{gpo_id}}}"
+        xml = f"{base}/{root}/Preferences/ScheduledTasks/ScheduledTasks.xml"
+
+        # remove the XML
+        try:
+            self._smb_session.deleteFile(share, xml)
+            logging.info(f"Deleted {xml}")
+        except SessionError as e:
+            logging.error(f"XML delete failed: {e}")
+            return False
+
+        return True
