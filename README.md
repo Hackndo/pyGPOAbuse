@@ -33,6 +33,13 @@ Reverse shell example
     -user
 ``` 
 
+### Cleanup
+Delete the scheduled task after it executed.
+
+```bash
+./pygpoabuse.py DOMAIN/user -hashes lm:nt -gpo-id "12345677-ABCD-9876-ABCD-123456789012" --cleanup
+```
+
 
 ## Credits
 
