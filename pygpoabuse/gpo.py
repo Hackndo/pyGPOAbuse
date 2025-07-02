@@ -169,6 +169,8 @@ class GPO:
 
         if gpo_type == "computer":
             root_path = "Machine"
+        elif gpo_type == "user_as_admin":
+            root_path = "User"
         else:
             root_path = "User"
 
