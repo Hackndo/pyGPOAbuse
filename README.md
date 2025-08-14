@@ -1,4 +1,17 @@
-# pyGPOAbuse
+# pyGPOAbuse_samba_ad_dc fork
+
+this fork contains support for samba ad dc for creating tasks behalf of privileged gpo.  
+
+exploitation steps:  
+1- create executable file with your needs. it can be bash script or elf binary.  
+2- execute pygpoabuse.py against a samba ad dc.  
+3- after gp update, machine/machines received a cron job that will be ran at reboot.  
+4- reboot machine/machines to see if your executable worked.  
+
+here's a poc:  
+![poc](https://github.com/crosscutsaw/pyGPOAbuse_samba_ad_dc/raw/master/assets/forkyou.jpg)
+
+## below is original pygpoabuse repository readme  
 
 ## Description
 
@@ -46,4 +59,5 @@ Delete the scheduled task after it executed.
 * [@pkb1s](https://twitter.com/pkb1s) for [SharpGPOAbuse](https://github.com/FSecureLABS/SharpGPOAbuse)
 * [@airman604](https://twitter.com/airman604) for [schtask_now.py](https://github.com/airman604/schtask_now)
 * [@SkelSec](https://twitter.com/skelsec) for [msldap](https://github.com/skelsec/msldap)
+
 
