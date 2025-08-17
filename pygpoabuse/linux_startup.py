@@ -12,10 +12,12 @@ def _md5_upper(b: bytes) -> str:
 class LinuxStartupAbuse:
 
     def __init__(self, smb_session, domain_fqdn, gpo_guid,
-                 exec_local_path, exec_args="", run_as="root", run_once=False):
+                 exec_local_path, exec_args="", run_as="root", run_once=True):
         self.conn = smb_session
         self.share = "SYSVOL"
         self.domain_fqdn = domain_fqdn
+        if not (gpo_guid.startswith("{") and gpo_guid.endswith("}")):
+            gpo_guid = "{" + gpo_guid.strip("{}") + "}"
         self.gpo_guid = gpo_guid
         self.exec_local_path = exec_local_path
         self.exec_args = exec_args or ""

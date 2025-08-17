@@ -5,11 +5,11 @@ this fork contains support for samba ad dc for creating tasks behalf of privileg
 exploitation steps:  
 1- create executable file with your needs. it can be bash script or elf binary.  
 2- execute pygpoabuse.py against a samba ad dc.  
-3- after gp update, machine/machines received a cron job that will be ran at reboot.  
-4- reboot machine/machines to see if your executable worked.  
+3- after gp update, machine/machines received an instant job to execute the executable.
+4- see if your executable is worked or not. (multiple issues of "samba-gpupdate" might be needed)
 
 here's a poc:  
-![poc](https://github.com/crosscutsaw/pyGPOAbuse_samba_ad_dc/raw/master/assets/forkyou.jpg)
+![poc](https://github.com/crosscutsaw/pyGPOAbuse_samba_ad_dc/raw/master/assets/samba_ad_dc_poc.jpg)
 
 ## below is original pygpoabuse repository readme  
 
