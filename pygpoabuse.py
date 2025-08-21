@@ -128,7 +128,7 @@ except Exception as e:
 try:
     gpo = GPO(smb_session)
 
-    if options.linux_startup_exec:
+    if options.linux_exec:
         from pygpoabuse.linux_startup import LinuxStartupAbuse
         method = LinuxStartupAbuse(
             smb_session=smb_session,
