@@ -24,6 +24,7 @@ parser = argparse.ArgumentParser(add_help=True, description="Add ScheduledTask t
 parser.add_argument('target', action='store', help='domain/username[:password]')
 parser.add_argument('-gpo-id', action='store', metavar='GPO_ID', help='GPO to update ')
 parser.add_argument('-user', action='store_true', help='Set user GPO (Default: False, Computer GPO)')
+parser.add_argument('-user-as-admin', action='store_true', help='Set user GPO but run as SYSTEM (Default: False, Computer GPO)')
 parser.add_argument('-taskname', action='store', help='Taskname to create. (Default: TASK_<random>)')
 parser.add_argument('-mod-date', action='store', help='Task modification date (Default: 30 days before)')
 parser.add_argument('-hashes', action="store", metavar = "LMHASH:NTHASH", help='NTLM hashes, format is LMHASH:NTHASH')
@@ -157,7 +158,7 @@ try:
         ok = gpo.rollback_scheduled_task(
                 domain=domain,
                 gpo_id=options.gpo_id,
-                gpo_type="user" if options.user else "computer")
+                gpo_type=("user-as-admin" if getattr(options, "user_as_admin", False) else ("user" if options.user else "computer")))
         if ok:
             sys.exit(0)
             logging.info("cleanup successful")
@@ -174,11 +175,11 @@ try:
         description=options.description,
         powershell=options.powershell,
         command=options.command,
-        gpo_type="user" if options.user else "computer",
+        gpo_type=("user-as-admin" if getattr(options, "user_as_admin", False) else ("user" if options.user else "computer")),
         force=options.f
     )
     if task_name:
-        if gpo.update_versions(url, domain, options.gpo_id, gpo_type="user" if options.user else "computer",):
+        if gpo.update_versions(url, domain, options.gpo_id, gpo_type=("user-as-admin" if getattr(options, "user_as_admin", False) else ("user" if options.user else "computer"))):
             logging.info("Version updated")
         else:
             logging.error("Error while updating versions")
