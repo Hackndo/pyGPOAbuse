@@ -1,3 +1,21 @@
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "pygpoabuse"
+version = "0.4.1"
+description = "Abuse GPOs for privilege escalation"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+  "msldap",
+  "impacket",
+]
+
+[project.scripts]
+pygpoabuse = "pygpoabuse.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pygpoabuse*"]
