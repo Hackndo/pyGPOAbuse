@@ -17,6 +17,10 @@ class GPO:
 
         if extensionName is None:
             extensionName = ""
+        elif isinstance(extensionName, list):
+            # msldap returns single-valued attributes as a one-element list;
+            # joining ensures the subsequent substring check works correctly.
+            extensionName = ''.join(extensionName)
 
         try:
             if not val2 in extensionName:
@@ -88,7 +92,12 @@ class GPO:
             return False
 
         version = await ldap.get_attribute("versionNumber")
-        
+        # versionNumber may come back as False (not found) or as an int/str;
+        # normalise to int so arithmetic and the LDAP write are both safe.
+        if version is False or version is None:
+            version = 0
+        version = int(version)
+
         if gpo_type == "computer":
             attribute_name = "gPCMachineExtensionNames"
             updated_version = version + 1
@@ -107,7 +116,9 @@ class GPO:
         logging.debug("New extensionName: {}".format(updated_extensionName))
 
         await ldap.update_attribute(attribute_name, updated_extensionName, extensionName)
-        await ldap.update_attribute("versionNumber", updated_version, version)
+        # AD encodes Integer attributes as their ASCII string representation;
+        # sending a Python int causes invalidAttributeSyntax (error 0x57).
+        await ldap.update_attribute("versionNumber", str(updated_version), str(version))
 
         return updated_version
 
