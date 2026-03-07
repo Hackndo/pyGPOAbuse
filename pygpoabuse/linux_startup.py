@@ -2,6 +2,7 @@
 import io
 import ntpath
 import hashlib
+import re
 
 MANIFEST_REL = r"MACHINE\VGP\VTLA\Unix\Scripts\Startup\manifest.xml"
 STARTUP_DIR_REL = r"MACHINE\VGP\VTLA\Unix\Scripts\Startup"
@@ -101,7 +102,14 @@ class LinuxStartupAbuse:
                     version = int(line.split("=", 1)[1].strip())
                 except Exception:
                     pass
-        new = "[General]\nVersion={}\n".format(version + 1)
+        new_version = version + 1
+        if cur:
+            # Update only the Version= line in place, preserving the rest of the file
+            new, count = re.subn(r'(?im)^(Version=)\d+', f'Version={new_version}', cur)
+            if count == 0:
+                new = cur.rstrip('\n') + f'\nVersion={new_version}\n'
+        else:
+            new = f'[General]\nVersion={new_version}\n'
         self._write_all(self._gpt_ini_path, new.encode("utf-8"))
 
     def run(self, cleanup: bool = False):

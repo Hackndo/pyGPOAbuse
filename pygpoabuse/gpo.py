@@ -74,7 +74,10 @@ class GPO:
                     new_values2.append(new_val)
 
                 return "".join(new_values2)
-        except:
+
+            # val2 already registered — nothing to change
+            return extensionName
+        except Exception:
             return "[{" + val1 + "}{" + val2 + "}]" + "[{" + val3 + "}{" + val2 + "}]"
 
     async def update_ldap(self, url, domain, gpo_id, gpo_type="computer"):
@@ -95,7 +98,7 @@ class GPO:
 
         extensionName = await ldap.get_attribute(attribute_name)
 
-        if extensionName == False:
+        if extensionName is False:
             logging.debug("Could not get {} attribute".format(attribute_name))
             return False
 
@@ -127,7 +130,7 @@ class GPO:
                 new_content = re.sub('=[0-9]+', '={}'.format(updated_version), content.decode("latin-1"))
             self._smb_session.writeFile(tid, fid, new_content)
             self._smb_session.closeFile(tid, fid)
-        except:
+        except Exception:
             logging.error("Unable to update gpt.ini file", exc_info=True)
             return False
 
@@ -140,11 +143,11 @@ class GPO:
             try:
                 self._smb_session.listPath("SYSVOL", base_path)
                 logging.debug("{} exists".format(base_path))
-            except:
+            except Exception:
                 try:
                     self._smb_session.createDirectory("SYSVOL", base_path)
                     logging.debug("{} created".format(base_path))
-                except:
+                except Exception:
                     logging.error("This user doesn't seem to have the necessary rights", exc_info=True)
                     return False
         return True
@@ -154,7 +157,7 @@ class GPO:
         try:
             tid = self._smb_session.connectTree("SYSVOL")
             logging.debug("Connected to SYSVOL")
-        except:
+        except Exception:
             logging.error("Unable to connect to SYSVOL share", exc_info=True)
             return False
 
@@ -163,22 +166,18 @@ class GPO:
         try:
             self._smb_session.listPath("SYSVOL", path)
             logging.debug("GPO id {} exists".format(gpo_id))
-        except:
+        except Exception:
             logging.error("GPO id {} does not exist".format(gpo_id), exc_info=True)
             return False
 
-        if gpo_type == "computer":
-            root_path = "Machine"
-        elif gpo_type == "user_as_admin":
-            root_path = "User"
-        else:
-            root_path = "User"
+        root_path = "Machine" if gpo_type == "computer" else "User"
 
         if not self._check_or_create(path, "{}/Preferences/ScheduledTasks".format(root_path)):
             return False
 
         path += "{}/Preferences/ScheduledTasks/ScheduledTasks.xml".format(root_path)
 
+        fid = None
         try:
             fid = self._smb_session.openFile(tid, path)
             st_content = self._smb_session.readFile(tid, fid, singleCall=False).decode("utf-8")
@@ -187,6 +186,8 @@ class GPO:
             tasks = st.parse_tasks(st_content)
 
             if not force:
+                self._smb_session.closeFile(tid, fid)
+                fid = None
                 logging.error("The GPO already includes a ScheduledTasks.xml.")
                 logging.error("Use -f to append to ScheduledTasks.xml")
                 logging.error("Use -v to display existing tasks")
@@ -196,13 +197,19 @@ class GPO:
                 return False
 
             new_content = st.generate_scheduled_task_xml()
-        except Exception as e:
-            # File does not exist
+        except Exception:
+            # File does not exist — close any stale handle before creating
+            if fid is not None:
+                try:
+                    self._smb_session.closeFile(tid, fid)
+                except Exception:
+                    pass
+                fid = None
             logging.debug("ScheduledTasks.xml does not exist. Creating it...")
             try:
                 fid = self._smb_session.createFile(tid, path)
                 logging.debug("ScheduledTasks.xml created")
-            except:
+            except Exception:
                 logging.error("This user doesn't seem to have the necessary rights", exc_info=True)
                 return False
             st = ScheduledTask(gpo_type=gpo_type, name=name, mod_date=mod_date, description=description, powershell=powershell, command=command)
@@ -211,7 +218,7 @@ class GPO:
         try:
             self._smb_session.writeFile(tid, fid, new_content)
             logging.debug("ScheduledTasks.xml has been saved")
-        except:
+        except Exception:
             logging.error("This user doesn't seem to have the necessary rights", exc_info=True)
             self._smb_session.closeFile(tid, fid)
             return False

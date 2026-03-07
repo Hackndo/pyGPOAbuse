@@ -5,7 +5,7 @@ import re
 import uuid
 from base64 import b64encode
 from datetime import datetime, timedelta
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
 import xml.etree.ElementTree as ET
 
 
@@ -15,7 +15,7 @@ class ScheduledTask:
         self._type = gpo_type
 
         if name:
-            self._name = name
+            self._name = escape(name, {'"': '&quot;'})
         else:
             self._name = "TASK_" + binascii.b2a_hex(os.urandom(4)).decode('ascii')
 
@@ -27,7 +27,7 @@ class ScheduledTask:
         self._guid = str(uuid.uuid4()).upper()
         self._author = "NT AUTHORITY\\System"
         if description:
-            self._description = description
+            self._description = escape(description)
         else:
             self._description = "MSBuild build and release task"
 
@@ -72,6 +72,9 @@ class ScheduledTask:
         for child in elem.findall("*"):
             task_type = child.tag
             task_properties = child.find("Properties")
+            if task_properties is None:
+                tasks.append(["?", "<unknown>", task_type or "<unknown>"])
+                continue
             action = task_properties.get('action')
             name = task_properties.get('name')
             tasks.append([
