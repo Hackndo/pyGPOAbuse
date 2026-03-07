@@ -57,7 +57,7 @@ class Ldap:
         else:
             action = 'replace'
         _, err = await self.ldap_client.modify(self.dn, {
-            attribute: [(action, [value])]
+            attribute: [(action, value)]
         })
         if err is not None:
             logging.debug("Error while updating {}".format(attribute))

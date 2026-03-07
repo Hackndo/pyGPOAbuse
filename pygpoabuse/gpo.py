@@ -15,74 +15,27 @@ class GPO:
         val2 = "CAB54552-DEEA-4691-817E-ED4A4D1AFC72"
         val3 = "AADCED64-746C-4633-A97C-D61349046527"
 
-        if extensionName is None:
-            extensionName = ""
-        elif isinstance(extensionName, list):
-            # msldap returns single-valued attributes as a one-element list;
-            # joining ensures the subsequent substring check works correctly.
+        if isinstance(extensionName, list):
             extensionName = ''.join(extensionName)
 
-        try:
-            if not val2 in extensionName:
-                new_values = []
-                toUpdate = ''.join(extensionName)
-                test = toUpdate.split("[")
-                for i in test:
-                    new_values.append(i.replace("{", "").replace("}", " ").replace("]", ""))
+        if not extensionName:
+            return "[{" + val1 + "}{" + val2 + "}][{" + val3 + "}{" + val2 + "}]"
 
-                if val1 not in toUpdate:
-                    new_values.append(val1 + " " + val2)
+        brackets = {}
+        for m in re.finditer(r'\[([^\]]+)\]', extensionName):
+            guids = re.findall(r'\{([^}]+)\}', m.group(1))
+            if guids:
+                brackets[guids[0]] = guids[1:]
 
-                elif val1 in toUpdate:
-                    for k, v in enumerate(new_values):
-                        if val1 in new_values[k]:
-                            toSort = []
-                            test2 = new_values[k].split()
-                            for f in range(1, len(test2)):
-                                toSort.append(test2[f])
-                            toSort.append(val2)
-                            toSort.sort()
-                            new_values[k] = test2[0]
-                            for val in toSort:
-                                new_values[k] += " " + val
+        for leader in (val1, val3):
+            brackets.setdefault(leader, [])
+            if val2 not in brackets[leader]:
+                brackets[leader].append(val2)
 
-                if val3 not in toUpdate:
-                    new_values.append(val3 + " " + val2)
-
-                elif val3 in toUpdate:
-                    for k, v in enumerate(new_values):
-                        if val3 in new_values[k]:
-                            toSort = []
-                            test2 = new_values[k].split()
-                            for f in range(1, len(test2)):
-                                toSort.append(test2[f])
-                            toSort.append(val2)
-                            toSort.sort()
-                            new_values[k] = test2[0]
-                            for val in toSort:
-                                new_values[k] += " " + val
-
-                new_values.sort()
-
-                new_values2 = []
-                for i in range(len(new_values)):
-                    if new_values[i] is None or new_values[i] == "":
-                        continue
-                    value1 = new_values[i].split()
-                    new_val = ""
-                    for q in range(len(value1)):
-                        if value1[q] is None or value1[q] == "":
-                            continue
-                        new_val += "{" + value1[q] + "}"
-                    new_val = "[" + new_val + "]"
-                    new_values2.append(new_val)
-
-                return "".join(new_values2)
-
-            # val2 already registered — nothing to change
-            return extensionName
-        except Exception:
-            return "[{" + val1 + "}{" + val2 + "}]" + "[{" + val3 + "}{" + val2 + "}]"
+        result = ""
+        for leader in sorted(brackets):
+            result += "[{" + leader + "}" + "".join("{" + g + "}" for g in brackets[leader]) + "]"
+        return result
 
     async def update_ldap(self, url, domain, gpo_id, gpo_type="computer"):
         ldap = Ldap(url, gpo_id, domain)
@@ -91,12 +44,7 @@ class GPO:
             logging.debug("Could not connect to LDAP")
             return False
 
-        version = await ldap.get_attribute("versionNumber")
-        # versionNumber may come back as False (not found) or as an int/str;
-        # normalise to int so arithmetic and the LDAP write are both safe.
-        if version is False or version is None:
-            version = 0
-        version = int(version)
+        version = await ldap.get_attribute("versionNumber") or 0
 
         if gpo_type == "computer":
             attribute_name = "gPCMachineExtensionNames"
@@ -116,9 +64,7 @@ class GPO:
         logging.debug("New extensionName: {}".format(updated_extensionName))
 
         await ldap.update_attribute(attribute_name, updated_extensionName, extensionName)
-        # AD encodes Integer attributes as their ASCII string representation;
-        # sending a Python int causes invalidAttributeSyntax (error 0x57).
-        await ldap.update_attribute("versionNumber", str(updated_version), str(version))
+        await ldap.update_attribute("versionNumber", updated_version, version)
 
         return updated_version
 
