@@ -107,12 +107,12 @@ def main():
         if not options.ccache:
             logging.error('-ccache required (path of ccache file, must be in local directory)')
             sys.exit(1)
-        url = '{}+kerberos-ccache://{}\\{}:{}@{}/?dc={}'.format(protocol, domain, username, quote(options.ccache, safe=''), dc_ip, dc_ip)
+        url = '{}+kerberos-ccache://{}\\{}:{}@{}/?dc={}'.format(protocol, domain, username, quote(options.ccache, safe="".join(c for c in map(chr, range(33, 127)) if c not in '@#?/')), dc_ip, dc_ip)
     elif password != '':
-        url = '{}+ntlm-password://{}\\{}:{}@{}'.format(protocol, domain, username, quote(password, safe=''), dc_ip)
+        url = '{}+ntlm-password://{}\\{}:{}@{}'.format(protocol, domain, username, quote(password, safe="".join(c for c in map(chr, range(33, 127)) if c not in '@#?/')), dc_ip)
         lmhash, nthash = "", ""
     else:
-        url = '{}+ntlm-nt://{}\\{}:{}@{}'.format(protocol, domain, username, quote(options.hashes.split(":")[1], safe=''), dc_ip)
+        url = '{}+ntlm-nt://{}\\{}:{}@{}'.format(protocol, domain, username, quote(options.hashes.split(":")[1], safe="".join(c for c in map(chr, range(33, 127)) if c not in '@#?/')), dc_ip)
         lmhash, nthash = options.hashes.split(":")
 
     if options.gpo_name:
