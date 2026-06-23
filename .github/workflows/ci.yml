@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+      - add-ci-for-smabot
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run tests
+        run: |
+          python -m pytest -q || rc=$?
+          if [ -n "${rc:-}" ]; then
+            if [ "$rc" -eq 5 ]; then
+              echo "No tests collected by pytest (exit code 5). Continuing without failing the job."
+            else
+              echo "pytest finished with exit code $rc. Failing the job."
+              exit $rc
+            fi
+          fi
+
+      - name: Telegram notification (curl)
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "Attempting to send Telegram notification..."
+          if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] || [ -z "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            echo "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID secret; skipping Telegram notification."
+            exit 0
+          fi
+
+          # Send message and print raw response for debugging
+          resp=$(curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="Repo: ${{ github.repository }} | Workflow: ${{ github.workflow }} | Job: ${{ job.name }} | Status: ${{ job.status }} | Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}")
+
+          echo "Telegram response: $resp"
+          if echo "$resp" | grep -q '"ok":true'; then
+            echo "Telegram message sent."
+          else
+            echo "Telegram API returned error."
+            echo "$resp"
+          fi

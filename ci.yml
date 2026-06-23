@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - add-ci-for-smabot
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run tests
+        run: |
+          pytest -q
+
+      - name: Telegram notification
+        if: always()
+        uses: appleboy/telegram-action@v0.4.0
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            Repo: ${{ github.repository }}
+            Workflow: ${{ github.workflow }}
+            Job: ${{ job.name }}
+            Status: ${{ job.status }}
+            Ref: ${{ github.ref }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
