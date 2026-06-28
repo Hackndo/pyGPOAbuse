@@ -54,6 +54,8 @@ def main():
     parser.add_argument('-ccache', action='store', help='ccache file name (must be in local directory)')
     parser.add_argument('-f', action='store_true', help='Force add ScheduleTask')
     parser.add_argument('-v', action='count', default=0, help='Verbosity level (-v or -vv)')
+    parser.add_argument('--no-run-once', action='store_true',
+                        help='Disable "Apply once and do not reapply". By default the task runs once; use this flag to reapply on every GPO refresh.')
     filtered = parser.add_argument_group("Host/User targeting via filters (mirrors SharpGPOAbuse --FilterEnabled)")
     filtered.add_argument('-filter-enabled', action='store_true',
                            help='Enable GPO Host/User targeting so the scheduled task only runs for a specific host/user')
@@ -206,7 +208,8 @@ def main():
             force=options.f,
             filter_enabled=options.filter_enabled,
             target_dns_name=options.target_dns_name,
-            target_username=options.target_username,
+            target_username=options.target_username, 
+            run_once=not options.no_run_once,
             target_user_sid=options.target_user_sid
         )
         if task_name:

